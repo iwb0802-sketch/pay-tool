@@ -1,140 +1,66 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>BNS Music 연주자 페이 정산</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BNS / INUS 연주자 페이 정산 도구</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f7f2ea;--card:#fffdf9;--ink:#1d1a17;--muted:#7b6d61;--line:#e3d6c8;--accent:#1c1a17;--soft:#efe4d8;--danger:#b3261e;--ok:#167c3b}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#fbf8f3,#f2eadf);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR","Segoe UI",sans-serif;color:var(--ink)}.wrap{max-width:1180px;margin:0 auto;padding:38px 20px 80px}.top{display:grid;grid-template-columns:1fr 320px;gap:28px;align-items:start}.eyebrow{letter-spacing:.22em;color:#916b3b;font-weight:800;font-size:13px}.title{font-size:54px;line-height:1.05;margin:12px 0 12px;font-weight:900}.desc{font-size:17px;color:#6f6258;line-height:1.55}.card{background:rgba(255,253,249,.92);border:1px solid var(--line);border-radius:22px;box-shadow:0 18px 50px rgba(64,43,25,.10)}.guide{padding:24px}.guide h3{margin:0 0 12px}.guide ol{margin:0;padding-left:22px;color:#6f6258;line-height:1.8}.upload{margin-top:20px;padding:22px}.drop{border:2px dashed #d1bba4;border-radius:18px;padding:28px;text-align:center;background:#fffaf3;cursor:pointer;transition:.15s}.drop:hover{background:#fff4e6;border-color:#b89066}.drop .icon{font-size:36px}.drop b{display:block;margin:10px 0 7px}.drop span{color:#8b7b6e}.fileInput{display:none}.status{margin-top:14px;color:#6f6258}.status.err{color:var(--danger);font-weight:700}.status.ok{color:var(--ok);font-weight:700}.controls{margin-top:18px;padding:22px;display:grid;grid-template-columns:160px 160px 1fr 260px auto auto;gap:12px;align-items:end}.field label{display:block;font-size:13px;font-weight:800;color:#725d4a;margin-bottom:7px}.field input{width:100%;height:46px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:0 14px;font-size:15px}.hint{font-size:12px;color:#8a7b70;line-height:1.35;margin-top:6px}.btn{border:0;border-radius:14px;height:46px;padding:0 22px;font-weight:900;cursor:pointer}.btn.primary{background:var(--accent);color:white}.btn.soft{background:var(--soft);color:#3a2b1e}.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin:18px 0}.stat{padding:20px}.stat .k{color:#8a6d56;font-size:13px}.stat .v{font-size:28px;font-weight:900;margin-top:8px}.section{margin-top:18px;padding:22px}.section h2{margin:0 0 14px;font-size:22px}.tableWrap{overflow:auto;border:1px solid var(--line);border-radius:16px;background:white}table{width:100%;border-collapse:collapse;min-width:860px}th,td{padding:12px 12px;border-bottom:1px solid #eee3d7;text-align:left;font-size:14px}th{background:#f5eadf;color:#634c38;font-weight:900;position:sticky;top:0}td.num{text-align:right;font-variant-numeric:tabular-nums}.empty{padding:34px;text-align:center;color:#857568}.downloads{display:flex;gap:10px;margin-top:12px}.badge{display:inline-block;background:#f6eadb;border:1px solid #e4d0bc;border-radius:999px;padding:3px 8px;font-size:12px;color:#6a513d}@media(max-width:900px){.top{grid-template-columns:1fr}.controls{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}.title{font-size:38px}}</style>
 </head>
 <body>
-  <main class="wrap">
-    <section class="hero">
-      <div>
-        <p class="eyebrow">BNS / INUS 정산 도구</p>
-        <h1>연주자 페이 자동 정리</h1>
-        <p class="sub">관리자 페이지에서 받은 엑셀 파일을 올리면 기간별 연주자 건수, 총 페이, 3.3% 공제 후 실지급액을 자동으로 집계합니다. 파일은 브라우저 안에서만 처리됩니다.</p>
-      </div>
-      <div class="heroCard">
-        <strong>사용 순서</strong>
-        <ol>
-          <li>행사 목록 엑셀 다운로드</li>
-          <li>이 페이지에 업로드</li>
-          <li>기간 선택 후 정산하기</li>
-          <li>요약/상세 엑셀 다운로드</li>
-        </ol>
-      </div>
-    </section>
-
-    <section class="panel uploadPanel">
-      <label class="drop" id="dropZone">
-        <input type="file" id="fileInput" accept=".xls,.xlsx,.csv,.html,.htm" />
-        <span class="dropIcon">↥</span>
-        <strong>엑셀 파일 선택 또는 드래그</strong>
-        <em>예: BNS_Music_Event_20260523.xls</em>
-      </label>
-      <div class="fileInfo" id="fileInfo">아직 파일을 불러오지 않았습니다.</div>
-    </section>
-
-    <section class="panel controls">
-      <div class="field">
-        <label>시작일</label>
-        <input type="date" id="startDate" />
-      </div>
-      <div class="field">
-        <label>종료일</label>
-        <input type="date" id="endDate" />
-      </div>
-      <div class="field wide">
-        <label>연주자/장소 검색</label>
-        <input type="search" id="keyword" placeholder="예: 이우영, 피아노, L65" />
-      </div>
-      <div class="field taxField">
-        <label>3.3% 공제 제외 글자/이름</label>
-        <input type="text" id="taxExemptKeywords" placeholder="예: 세금x, 홍길동, 현금" />
-        <small>쉼표(,)로 여러 개 입력. 연주자명에 포함되면 공제하지 않습니다.</small>
-      </div>
-      <button id="runBtn" class="primary">정산하기</button>
-      <button id="resetBtn" class="ghost">초기화</button>
-    </section>
-
-    <section class="stats" id="stats" hidden>
-      <article><span>행사 수</span><strong id="eventCount">0</strong></article>
-      <article><span>연주자 건수</span><strong id="lineCount">0</strong></article>
-      <article><span>총 페이</span><strong id="totalPay">0원</strong></article>
-      <article><span>3.3% 공제 후</span><strong id="netPay">0원</strong></article>
-      <article><span>정산 인원</span><strong id="performerCount">0명</strong></article>
-    </section>
-
-    <section class="panel results" id="results" hidden>
-      <div class="resultHead">
-        <div>
-          <h2>연주자별 요약</h2>
-          <p id="rangeText"></p>
-        </div>
-        <div class="btns">
-          <button id="downloadSummary" class="ghost">요약 엑셀 다운로드</button>
-          <button id="downloadDetail" class="ghost">상세 엑셀 다운로드</button>
-        </div>
-      </div>
-      <div class="tableWrap">
-        <table id="summaryTable">
-          <thead>
-            <tr>
-              <th>연주자</th>
-              <th>건수</th>
-              <th>총 페이</th>
-              <th>3.3% 공제 후</th>
-              <th>세금x</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="panel results" id="detailPanel" hidden>
-      <div class="resultHead">
-        <div>
-          <h2>행사별 상세</h2>
-          <p>요약 행을 클릭하면 해당 연주자만 볼 수 있습니다. 연주자 이름에 세금x 또는 위 입력칸의 제외 글자가 들어간 건은 3.3%를 공제하지 않습니다.</p>
-        </div>
-      </div>
-      <div class="tableWrap detailWrap">
-        <table id="detailTable">
-          <thead>
-            <tr>
-              <th>날짜</th>
-              <th>시간</th>
-              <th>장소</th>
-              <th>연주편성</th>
-              <th>연주자</th>
-              <th>원페이</th>
-              <th>3.3% 공제 후</th>
-              <th>세금처리</th>
-              <th>발주처</th>
-              <th>담당</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="panel warning" id="warningPanel" hidden>
-      <h2>확인 필요</h2>
-      <p>악기페이 합계와 ‘연주자페이합계’가 다른 행입니다.</p>
-      <div class="tableWrap">
-        <table id="warningTable">
-          <thead><tr><th>날짜</th><th>장소</th><th>연주자페이합계</th><th>악기페이합</th><th>차이</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </section>
-  </main>
-  <script src="./app.js"></script>
-</body>
-</html>
+<div class="wrap">
+  <div class="top">
+    <div><div class="eyebrow">BNS / INUS 정산 도구</div><h1 class="title">연주자 페이 자동 정리</h1><p class="desc">관리자 페이지에서 받은 엑셀 파일을 올리면 기간별 연주자 건수, 총 페이, 3.3% 공제 후 실지급액을 자동으로 집계합니다. 파일은 브라우저 안에서만 처리됩니다.</p></div>
+    <div class="card guide"><h3>사용 순서</h3><ol><li>행사 목록 엑셀 다운로드</li><li>이 페이지에 업로드</li><li>기간 선택 후 정산하기</li><li>요약/상세 엑셀 다운로드</li></ol></div>
+  </div>
+  <div class="card upload">
+    <input id="fileInput" class="fileInput" type="file" accept=".xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" />
+    <div id="drop" class="drop"><div class="icon">↥</div><b>엑셀 파일 선택 또는 드래그</b><span>예: BNS_Music_Event_20260523.xls</span><br><button class="btn soft" style="margin-top:12px" type="button" id="pickBtn">파일 선택</button></div>
+    <div id="status" class="status">아직 파일을 불러오지 않았습니다.</div>
+  </div>
+  <div class="card controls">
+    <div class="field"><label>시작일</label><input type="date" id="startDate"></div>
+    <div class="field"><label>종료일</label><input type="date" id="endDate"></div>
+    <div class="field"><label>연주자/장소 검색</label><input id="search" placeholder="예: 이우영, 피아노, L65"></div>
+    <div class="field"><label>3.3% 공제 제외 글자/이름</label><input id="taxKeywords" placeholder="예: 세금x, 홍길동, 현금" value="세금x"><div class="hint">쉼표로 여러 개 입력. 연주자명에 포함되면 공제하지 않습니다.</div></div>
+    <button class="btn primary" id="calcBtn">정산하기</button><button class="btn soft" id="resetBtn">초기화</button>
+  </div>
+  <div class="stats"><div class="card stat"><div class="k">행사 수</div><div class="v" id="eventCount">0</div></div><div class="card stat"><div class="k">연주자 건수</div><div class="v" id="itemCount">0</div></div><div class="card stat"><div class="k">총 페이</div><div class="v" id="grossTotal">0원</div></div><div class="card stat"><div class="k">3.3% 공제 후</div><div class="v" id="netTotal">0원</div></div><div class="card stat"><div class="k">정산 인원</div><div class="v" id="personCount">0명</div></div></div>
+  <div class="card section"><h2>연주자별 요약</h2><div class="tableWrap" id="summaryWrap"><div class="empty">엑셀을 업로드하고 정산하기를 눌러주세요.</div></div><div class="downloads"><button class="btn soft" id="downloadSummary">요약 엑셀 다운로드</button><button class="btn soft" id="downloadDetail">상세 엑셀 다운로드</button></div></div>
+  <div class="card section"><h2>행사별 상세</h2><div class="tableWrap" id="detailWrap"><div class="empty">상세 내역이 여기에 표시됩니다.</div></div></div>
+</div>
+<script>
+let rawRows=[]; let details=[]; let summary=[];
+const $=id=>document.getElementById(id); const fmt=n=>(Math.round(Number(n)||0)).toLocaleString('ko-KR')+'원';
+function setStatus(msg,type=''){const el=$('status');el.textContent=msg;el.className='status '+type;}
+function parseDate(v){ if(!v) return null; if(v instanceof Date&&!isNaN(v)) return v; if(typeof v==='number'){const o=XLSX.SSF.parse_date_code(v); if(o) return new Date(o.y,o.m-1,o.d);} const s=String(v).trim().replace(/[.\/]/g,'-'); const m=s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return new Date(+m[1],+m[2]-1,+m[3]); return null; }
+function ymd(d){if(!d)return ''; return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function num(v){ if(v==null) return 0; const n=Number(String(v).replace(/[^0-9.-]/g,'')); return isNaN(n)?0:n;}
+function norm(s){return String(s||'').trim()}
+function findVal(row, names){ for(const n of names){ if(row[n]!=null && String(row[n]).trim()!=='') return row[n]; } return '' }
+function handleFile(file){
+ if(!file) return; setStatus('파일 읽는 중: '+file.name);
+ const reader=new FileReader();
+ reader.onerror=()=>setStatus('파일을 읽지 못했습니다. 다른 이름으로 저장(.xlsx) 후 다시 시도해 주세요.','err');
+ reader.onload=e=>{ try{
+   if(typeof XLSX==='undefined') throw new Error('엑셀 처리 라이브러리를 불러오지 못했습니다. 인터넷 연결/CDN 차단을 확인해 주세요.');
+   const data=new Uint8Array(e.target.result); const wb=XLSX.read(data,{type:'array',cellDates:true}); const ws=wb.Sheets[wb.SheetNames[0]]; rawRows=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
+   if(!rawRows.length) throw new Error('엑셀에 읽을 데이터가 없습니다.');
+   setStatus('업로드 완료: '+file.name+' / '+rawRows.length+'행','ok'); autoDates(); calculate();
+ }catch(err){ console.error(err); setStatus('업로드 실패: '+err.message,'err'); }};
+ reader.readAsArrayBuffer(file);
+}
+function autoDates(){ let ds=rawRows.map(r=>parseDate(findVal(r,['행사날짜','행사일자','날짜']))).filter(Boolean).sort((a,b)=>a-b); if(ds.length){$('startDate').value=ymd(ds[0]); $('endDate').value=ymd(ds[ds.length-1]);}}
+function toDetails(){ const out=[]; rawRows.forEach((r,idx)=>{ const date=parseDate(findVal(r,['행사날짜','행사일자','날짜'])); const dateStr=ymd(date); const place=norm(findVal(r,['장소/층수','장소','행사장소'])); const title=norm(findVal(r,['연주편성','행사명','상품명'])); for(let i=1;i<=12;i++){ const player=norm(findVal(r,[`악기구성${i}`,`연주자${i}`,`구성${i}`])); const pay=num(findVal(r,[`악기페이${i}`,`페이${i}`,`연주자페이${i}`])); if(player && pay){ out.push({행:idx+2, 날짜:dateStr, _date:date, 장소:place, 행사:title, 연주자:player, 원페이:pay}); } } }); return out;}
+function taxFreeName(name){ const kws=$('taxKeywords').value.split(',').map(s=>s.trim()).filter(Boolean); return kws.some(k=>name.includes(k)); }
+function calculate(){ if(!rawRows.length){setStatus('먼저 엑셀 파일을 업로드해 주세요.','err'); return;} let start=$('startDate').value?new Date($('startDate').value):null; let end=$('endDate').value?new Date($('endDate').value):null; if(end) end.setHours(23,59,59,999); const q=norm($('search').value).toLowerCase(); details=toDetails().filter(d=>(!start||d._date>=start)&&(!end||d._date<=end)&&(!q||(d.연주자+' '+d.장소+' '+d.행사).toLowerCase().includes(q))).map(d=>{const free=taxFreeName(d.연주자); const net=free?d.원페이:d.원페이*0.967; return {...d, 공제여부:free?'공제 제외':'3.3% 공제', 실지급액:Math.round(net)}});
+ const map=new Map(); details.forEach(d=>{ if(!map.has(d.연주자)) map.set(d.연주자,{연주자:d.연주자, 건수:0, 총페이:0, 실지급액:0, 공제제외:taxFreeName(d.연주자)?'Y':''}); const m=map.get(d.연주자); m.건수++; m.총페이+=d.원페이; m.실지급액+=d.실지급액; }); summary=[...map.values()].sort((a,b)=>b.실지급액-a.실지급액||a.연주자.localeCompare(b.연주자,'ko'));
+ render(); }
+function render(){ const ev=new Set(details.map(d=>d.날짜+'|'+d.장소+'|'+d.행사)); $('eventCount').textContent=ev.size; $('itemCount').textContent=details.length; $('grossTotal').textContent=fmt(details.reduce((s,d)=>s+d.원페이,0)); $('netTotal').textContent=fmt(details.reduce((s,d)=>s+d.실지급액,0)); $('personCount').textContent=summary.length+'명';
+ $('summaryWrap').innerHTML=summary.length?'<table><thead><tr><th>연주자</th><th>건수</th><th>총 페이</th><th>3.3% 공제 후</th><th>공제</th></tr></thead><tbody>'+summary.map(r=>`<tr><td>${r.연주자}</td><td class="num">${r.건수}</td><td class="num">${fmt(r.총페이)}</td><td class="num"><b>${fmt(r.실지급액)}</b></td><td>${r.공제제외?'<span class="badge">공제 제외</span>':'3.3%'}</td></tr>`).join('')+'</tbody></table>':'<div class="empty">조건에 맞는 결과가 없습니다.</div>';
+ $('detailWrap').innerHTML=details.length?'<table><thead><tr><th>날짜</th><th>장소</th><th>행사/편성</th><th>연주자</th><th>원 페이</th><th>공제</th><th>실지급액</th></tr></thead><tbody>'+details.map(d=>`<tr><td>${d.날짜}</td><td>${d.장소}</td><td>${d.행사}</td><td>${d.연주자}</td><td class="num">${fmt(d.원페이)}</td><td>${d.공제여부}</td><td class="num"><b>${fmt(d.실지급액)}</b></td></tr>`).join('')+'</tbody></table>':'<div class="empty">상세 내역이 없습니다.</div>'; }
+function download(name, rows){ if(!rows.length){alert('다운로드할 데이터가 없습니다.');return;} const clean=rows.map(r=>{const o={}; Object.keys(r).forEach(k=>{if(!k.startsWith('_')) o[k]=r[k]}); return o}); const ws=XLSX.utils.json_to_sheet(clean); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'정산'); XLSX.writeFile(wb,name); }
+$('pickBtn').onclick=()=>$('fileInput').click(); $('drop').onclick=e=>{ if(e.target.id!=='pickBtn') $('fileInput').click();}; $('fileInput').onchange=e=>handleFile(e.target.files[0]); ['dragenter','dragover'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').style.background='#fff1de'})); ['dragleave','drop'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').style.background=''})); $('drop').addEventListener('drop',e=>handleFile(e.dataTransfer.files[0])); $('calcBtn').onclick=calculate; $('resetBtn').onclick=()=>{rawRows=[];details=[];summary=[];$('fileInput').value='';['startDate','endDate','search'].forEach(id=>$(id).value='');setStatus('아직 파일을 불러오지 않았습니다.');render();}; $('downloadSummary').onclick=()=>download('연주자별_정산요약.xlsx',summary); $('downloadDetail').onclick=()=>download('연주자별_정산상세.xlsx',details);
+</script>
+</body></html>
