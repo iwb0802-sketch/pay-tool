@@ -4,6 +4,7 @@ let rawRows = [];
 let detailRows = [];
 let summaryRows = [];
 let warningRows = [];
+const TAX_RATE = 0.033;
 
 const fileInput = $('#fileInput');
 const dropZone = $('#dropZone');
@@ -13,8 +14,8 @@ const dropZone = $('#dropZone');
 dropZone.addEventListener('drop', e => { const f=e.dataTransfer.files?.[0]; if(f) loadFile(f); });
 fileInput.addEventListener('change', e => { const f=e.target.files?.[0]; if(f) loadFile(f); });
 $('#runBtn').addEventListener('click', runSettlement);
-$('#resetBtn').addEventListener('click', () => { $('#keyword').value=''; render(detailRows, summaryRows, warningRows); });
-$('#downloadSummary').addEventListener('click', () => downloadExcel('연주자별_정산요약.xls', summaryRows.map(r => ({연주자:r.performer, 건수:r.count, 총페이:r.total, 평균페이:Math.round(r.total/r.count)}))));
+$('#resetBtn').addEventListener('click', () => { $('#keyword').value=''; $('#taxExemptKeywords').value=''; runSettlement(); });
+$('#downloadSummary').addEventListener('click', () => downloadExcel('연주자별_정산요약.xls', summaryRows.map(r => ({연주자:r.performer, 건수:r.count, 총페이:r.total, '3.3%공제후':r.net, 세금제외건수:r.taxExemptCount}))));
 $('#downloadDetail').addEventListener('click', () => downloadExcel('연주자별_정산상세.xls', detailRows.map(toKoreanDetail)));
 
 async function loadFile(file){
@@ -94,16 +95,19 @@ function runSettlement(){
     let rowPaySum = 0;
     let hasAny = false;
     for(let i=1;i<=12;i++){
-      const performer = String(r[`악기구성${i}`] || '').replace(/\s+/g,' ').trim();
+      const performerRaw = String(r[`악기구성${i}`] || '').replace(/\s+/g,' ').trim();
+      const performer = cleanPerformerName(performerRaw);
+      const taxExempt = isTaxExemptName(performerRaw);
       const pay = money(r[`악기페이${i}`]);
+      const netPay = taxExempt ? pay : taxAdjusted(pay);
       if(!performer && !pay) continue;
       hasAny = true;
       rowPaySum += pay;
-      const searchable = `${base} ${performer}`.toLowerCase();
+      const searchable = `${base} ${performerRaw} ${performer}`.toLowerCase();
       if(kw && !searchable.includes(kw)) continue;
       detailRows.push({
         eventKey: `${date}-${idx}`,
-        date, time:r['시간']||'', place:r['장소/층수']||'', order:r['발주처']||'', formation:r['연주편성']||'', performer, pay,
+        date, time:r['시간']||'', place:r['장소/층수']||'', order:r['발주처']||'', formation:r['연주편성']||'', performer, performerRaw, pay, netPay, taxExempt,
         manager:r['발주담당자']||''
       });
       seenEvents.add(`${date}-${idx}`);
@@ -117,8 +121,12 @@ function runSettlement(){
   const map = new Map();
   detailRows.forEach(d => {
     if(!d.performer) return;
-    const cur = map.get(d.performer) || {performer:d.performer, count:0, total:0};
-    cur.count += 1; cur.total += d.pay; map.set(d.performer, cur);
+    const cur = map.get(d.performer) || {performer:d.performer, count:0, total:0, net:0, taxExemptCount:0};
+    cur.count += 1;
+    cur.total += d.pay;
+    cur.net += d.netPay;
+    if(d.taxExempt) cur.taxExemptCount += 1;
+    map.set(d.performer, cur);
   });
   summaryRows = [...map.values()].sort((a,b) => b.total-a.total || b.count-a.count || a.performer.localeCompare(b.performer,'ko'));
   render(detailRows, summaryRows, warningRows, seenEvents.size, start, end);
@@ -129,13 +137,14 @@ function render(details, summaries, warnings, eventCount=null, start='', end='')
   $('#eventCount').textContent = nf.format(eventCount ?? new Set(details.map(d=>d.eventKey)).size);
   $('#lineCount').textContent = nf.format(details.length);
   $('#totalPay').textContent = nf.format(details.reduce((s,d)=>s+d.pay,0))+'원';
+  $('#netPay').textContent = nf.format(details.reduce((s,d)=>s+d.netPay,0))+'원';
   $('#performerCount').textContent = nf.format(summaries.length)+'명';
   $('#rangeText').textContent = start && end ? `${start} ~ ${end}` : '';
 
   const stbody = $('#summaryTable tbody'); stbody.innerHTML = '';
   summaries.forEach(r => {
     const tr = document.createElement('tr'); tr.className='summary-row';
-    tr.innerHTML = `<td><strong>${esc(r.performer)}</strong></td><td class="num">${nf.format(r.count)}</td><td class="num"><strong>${nf.format(r.total)}원</strong></td><td class="num">${nf.format(Math.round(r.total/r.count))}원</td>`;
+    tr.innerHTML = `<td><strong>${esc(r.performer)}</strong></td><td class="num">${nf.format(r.count)}</td><td class="num"><strong>${nf.format(r.total)}원</strong></td><td class="num"><strong>${nf.format(r.net)}원</strong></td><td class="num">${r.taxExemptCount ? nf.format(r.taxExemptCount)+'건' : '-'}</td>`;
     tr.addEventListener('click', () => renderDetails(details.filter(d => d.performer === r.performer)));
     stbody.appendChild(tr);
   });
@@ -154,12 +163,31 @@ function renderDetails(details){
   details.sort((a,b)=> a.date.localeCompare(b.date) || a.time.localeCompare(b.time) || a.performer.localeCompare(b.performer,'ko'))
     .forEach(d => {
       const tr=document.createElement('tr');
-      tr.innerHTML = `<td>${esc(d.date)}</td><td>${esc(d.time)}</td><td>${esc(d.place)}</td><td>${esc(d.formation)}</td><td><strong>${esc(d.performer)}</strong></td><td class="num">${nf.format(d.pay)}원</td><td>${esc(d.order)}</td><td>${esc(d.manager)}</td>`;
+      tr.innerHTML = `<td>${esc(d.date)}</td><td>${esc(d.time)}</td><td>${esc(d.place)}</td><td>${esc(d.formation)}</td><td><strong>${esc(d.performer)}</strong></td><td class="num">${nf.format(d.pay)}원</td><td class="num"><strong>${nf.format(d.netPay)}원</strong></td><td>${d.taxExempt ? '세금 제외' : '3.3% 공제'}</td><td>${esc(d.order)}</td><td>${esc(d.manager)}</td>`;
       body.appendChild(tr);
     });
 }
 
-function toKoreanDetail(d){ return {날짜:d.date, 시간:d.time, 장소:d.place, 연주편성:d.formation, 연주자:d.performer, 페이:d.pay, 발주처:d.order, 발주담당:d.manager}; }
+function toKoreanDetail(d){ return {날짜:d.date, 시간:d.time, 장소:d.place, 연주편성:d.formation, 연주자:d.performer, 원페이:d.pay, '3.3%공제후':d.netPay, 세금처리:d.taxExempt ? '세금 제외' : '3.3% 공제', 발주처:d.order, 발주담당:d.manager}; }
+function getTaxExemptKeywords(){
+  const base = ['세금x'];
+  const extra = ($('#taxExemptKeywords')?.value || '')
+    .split(/[,
+]/)
+    .map(v => v.trim())
+    .filter(Boolean);
+  return [...base, ...extra];
+}
+
+function isTaxExemptName(name){
+  const target = String(name || '').toLowerCase().replace(/\s+/g, '');
+  return getTaxExemptKeywords().some(keyword => {
+    const key = String(keyword || '').toLowerCase().replace(/\s+/g, '');
+    return key && target.includes(key);
+  });
+}
+function cleanPerformerName(name){ return String(name || '').replace(/[\s\(\[\{]*세금\s*x[\s\)\]\}]*/ig, ' ').replace(/\s+/g,' ').trim(); }
+function taxAdjusted(amount){ return Math.round(amount * (1 - TAX_RATE)); }
 function esc(s){ return String(s ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 
 function downloadExcel(filename, rows){

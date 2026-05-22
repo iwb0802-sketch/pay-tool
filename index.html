@@ -16,7 +16,7 @@
       <div>
         <p class="eyebrow">BNS / INUS 정산 도구</p>
         <h1>연주자 페이 자동 정리</h1>
-        <p class="sub">관리자 페이지에서 받은 엑셀 파일을 올리면 기간별 연주자 건수와 총 페이를 자동으로 집계합니다. 파일은 브라우저 안에서만 처리됩니다.</p>
+        <p class="sub">관리자 페이지에서 받은 엑셀 파일을 올리면 기간별 연주자 건수, 총 페이, 3.3% 공제 후 실지급액을 자동으로 집계합니다. 파일은 브라우저 안에서만 처리됩니다.</p>
       </div>
       <div class="heroCard">
         <strong>사용 순서</strong>
@@ -52,6 +52,11 @@
         <label>연주자/장소 검색</label>
         <input type="search" id="keyword" placeholder="예: 이우영, 피아노, L65" />
       </div>
+      <div class="field taxField">
+        <label>3.3% 공제 제외 글자/이름</label>
+        <input type="text" id="taxExemptKeywords" placeholder="예: 세금x, 홍길동, 현금" />
+        <small>쉼표(,)로 여러 개 입력. 연주자명에 포함되면 공제하지 않습니다.</small>
+      </div>
       <button id="runBtn" class="primary">정산하기</button>
       <button id="resetBtn" class="ghost">초기화</button>
     </section>
@@ -60,6 +65,7 @@
       <article><span>행사 수</span><strong id="eventCount">0</strong></article>
       <article><span>연주자 건수</span><strong id="lineCount">0</strong></article>
       <article><span>총 페이</span><strong id="totalPay">0원</strong></article>
+      <article><span>3.3% 공제 후</span><strong id="netPay">0원</strong></article>
       <article><span>정산 인원</span><strong id="performerCount">0명</strong></article>
     </section>
 
@@ -81,7 +87,8 @@
               <th>연주자</th>
               <th>건수</th>
               <th>총 페이</th>
-              <th>평균</th>
+              <th>3.3% 공제 후</th>
+              <th>세금x</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -93,7 +100,7 @@
       <div class="resultHead">
         <div>
           <h2>행사별 상세</h2>
-          <p>요약 행을 클릭하면 해당 연주자만 볼 수 있습니다. 다시 전체를 보려면 초기화 또는 정산하기를 누르세요.</p>
+          <p>요약 행을 클릭하면 해당 연주자만 볼 수 있습니다. 연주자 이름에 세금x 또는 위 입력칸의 제외 글자가 들어간 건은 3.3%를 공제하지 않습니다.</p>
         </div>
       </div>
       <div class="tableWrap detailWrap">
@@ -105,7 +112,9 @@
               <th>장소</th>
               <th>연주편성</th>
               <th>연주자</th>
-              <th>페이</th>
+              <th>원페이</th>
+              <th>3.3% 공제 후</th>
+              <th>세금처리</th>
               <th>발주처</th>
               <th>담당</th>
             </tr>
