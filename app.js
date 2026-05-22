@@ -92,9 +92,12 @@ function runSettlement(){
   const seenEvents = new Set();
 
   rawRows.forEach((r, idx) => {
+    // 취소건 제외: 행사장/장소, 발주처, 연주편성 3개 영역만 확인
+    if(isCancelledEvent(r)) return;
+
     const date = normalizeDate(r['행사날짜']);
     if(!date || date < start || date > end) return;
-    const base = `${date} ${r['시간']||''} ${r['장소/층수']||''} ${r['연주편성']||''} ${r['발주처']||''} ${r['발주담당자']||''}`.toLowerCase();
+    const base = `${date} ${r['시간']||''} ${getPlaceText(r)} ${r['연주편성']||''} ${r['발주처']||''} ${r['발주담당자']||''}`.toLowerCase();
     let rowPaySum = 0;
     let hasAny = false;
     for(let i=1;i<=12;i++){
@@ -110,14 +113,14 @@ function runSettlement(){
       if(kw && !searchable.includes(kw)) continue;
       detailRows.push({
         eventKey: `${date}-${idx}`,
-        date, time:r['시간']||'', place:r['장소/층수']||'', order:r['발주처']||'', formation:r['연주편성']||'', performer, performerRaw, pay, netPay, taxExempt,
+        date, time:r['시간']||'', place:getPlaceText(r), order:r['발주처']||'', formation:r['연주편성']||'', performer, performerRaw, pay, netPay, taxExempt,
         manager:r['발주담당자']||''
       });
       seenEvents.add(`${date}-${idx}`);
     }
     const declared = money(r['연주자페이합계']);
     if(hasAny && declared && Math.abs(declared-rowPaySum) > 1){
-      warningRows.push({date, place:r['장소/층수']||'', declared, actual:rowPaySum, diff:rowPaySum-declared});
+      warningRows.push({date, place:getPlaceText(r), declared, actual:rowPaySum, diff:rowPaySum-declared});
     }
   });
 
@@ -169,6 +172,22 @@ function renderDetails(details){
       tr.innerHTML = `<td>${esc(d.date)}</td><td>${esc(d.time)}</td><td>${esc(d.place)}</td><td>${esc(d.formation)}</td><td><strong>${esc(d.performer)}</strong></td><td class="num">${nf.format(d.pay)}원</td><td class="num"><strong>${nf.format(d.netPay)}원</strong></td><td>${d.taxExempt ? '세금 제외' : '3.3% 공제'}</td><td>${esc(d.order)}</td><td>${esc(d.manager)}</td>`;
       body.appendChild(tr);
     });
+}
+
+
+function getPlaceText(r){
+  return r['행사장'] || r['장소/층수'] || r['장소'] || '';
+}
+
+function isCancelledEvent(r){
+  const checkText = [
+    r['행사장'],
+    r['장소/층수'],
+    r['장소'],
+    r['발주처'],
+    r['연주편성']
+  ].map(v => String(v || '')).join(' ');
+  return /\(?\s*취소\s*\)?/i.test(checkText);
 }
 
 function toKoreanDetail(d){ return {날짜:d.date, 시간:d.time, 장소:d.place, 연주편성:d.formation, 연주자:d.performer, 원페이:d.pay, '3.3%공제후':d.netPay, 세금처리:d.taxExempt ? '세금 제외' : '3.3% 공제', 발주처:d.order, 발주담당:d.manager}; }
