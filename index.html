@@ -32,6 +32,7 @@
 </div>
 <script>
 let rawRows=[]; let details=[]; let summary=[];
+const TAX_KEYWORDS_STORAGE_KEY='bnsPayToolTaxKeywords';
 const $=id=>document.getElementById(id); const fmt=n=>(Math.round(Number(n)||0)).toLocaleString('ko-KR')+'원';
 function setStatus(msg,type=''){const el=$('status');el.textContent=msg;el.className='status '+type;}
 function parseDate(v){ if(!v) return null; if(v instanceof Date&&!isNaN(v)) return v; if(typeof v==='number'){const o=XLSX.SSF.parse_date_code(v); if(o) return new Date(o.y,o.m-1,o.d);} const s=String(v).trim().replace(/[.\/]/g,'-'); const m=s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return new Date(+m[1],+m[2]-1,+m[3]); return null; }
@@ -53,7 +54,10 @@ function handleFile(file){
 }
 function autoDates(){ let ds=rawRows.map(r=>parseDate(findVal(r,['행사날짜','행사일자','날짜']))).filter(Boolean).sort((a,b)=>a-b); if(ds.length){$('startDate').value=ymd(ds[0]); $('endDate').value=ymd(ds[ds.length-1]);}}
 function toDetails(){ const out=[]; rawRows.forEach((r,idx)=>{ const date=parseDate(findVal(r,['행사날짜','행사일자','날짜'])); const dateStr=ymd(date); const place=norm(findVal(r,['장소/층수','장소','행사장소'])); const title=norm(findVal(r,['연주편성','행사명','상품명'])); for(let i=1;i<=12;i++){ const player=norm(findVal(r,[`악기구성${i}`,`연주자${i}`,`구성${i}`])); const pay=num(findVal(r,[`악기페이${i}`,`페이${i}`,`연주자페이${i}`])); if(player && pay){ out.push({행:idx+2, 날짜:dateStr, _date:date, 장소:place, 행사:title, 연주자:player, 원페이:pay}); } } }); return out;}
-function taxFreeName(name){ const kws=$('taxKeywords').value.split(',').map(s=>s.trim()).filter(Boolean); return kws.some(k=>name.includes(k)); }
+function getTaxKeywords(){ return $('taxKeywords').value.split(',').map(s=>s.trim()).filter(Boolean); }
+function saveTaxKeywords(){ try{ localStorage.setItem(TAX_KEYWORDS_STORAGE_KEY, $('taxKeywords').value); }catch(e){} }
+function loadTaxKeywords(){ try{ const saved=localStorage.getItem(TAX_KEYWORDS_STORAGE_KEY); if(saved!==null) $('taxKeywords').value=saved; }catch(e){} }
+function taxFreeName(name){ const kws=getTaxKeywords(); return kws.some(k=>name.includes(k)); }
 function calculate(){ if(!rawRows.length){setStatus('먼저 엑셀 파일을 업로드해 주세요.','err'); return;} let start=$('startDate').value?new Date($('startDate').value):null; let end=$('endDate').value?new Date($('endDate').value):null; if(end) end.setHours(23,59,59,999); const q=norm($('search').value).toLowerCase(); details=toDetails().filter(d=>(!start||d._date>=start)&&(!end||d._date<=end)&&(!q||(d.연주자+' '+d.장소+' '+d.행사).toLowerCase().includes(q))).map(d=>{const free=taxFreeName(d.연주자); const net=free?d.원페이:d.원페이*0.967; return {...d, 공제여부:free?'공제 제외':'3.3% 공제', 실지급액:Math.round(net)}});
  const map=new Map(); details.forEach(d=>{ if(!map.has(d.연주자)) map.set(d.연주자,{연주자:d.연주자, 건수:0, 총페이:0, 실지급액:0, 공제제외:taxFreeName(d.연주자)?'Y':''}); const m=map.get(d.연주자); m.건수++; m.총페이+=d.원페이; m.실지급액+=d.실지급액; }); summary=[...map.values()].sort((a,b)=>b.실지급액-a.실지급액||a.연주자.localeCompare(b.연주자,'ko'));
  render(); }
@@ -62,5 +66,9 @@ function render(){ const ev=new Set(details.map(d=>d.날짜+'|'+d.장소+'|'+d.�
  $('detailWrap').innerHTML=details.length?'<table><thead><tr><th>날짜</th><th>장소</th><th>행사/편성</th><th>연주자</th><th>원 페이</th><th>공제</th><th>실지급액</th></tr></thead><tbody>'+details.map(d=>`<tr><td>${d.날짜}</td><td>${d.장소}</td><td>${d.행사}</td><td>${d.연주자}</td><td class="num">${fmt(d.원페이)}</td><td>${d.공제여부}</td><td class="num"><b>${fmt(d.실지급액)}</b></td></tr>`).join('')+'</tbody></table>':'<div class="empty">상세 내역이 없습니다.</div>'; }
 function download(name, rows){ if(!rows.length){alert('다운로드할 데이터가 없습니다.');return;} const clean=rows.map(r=>{const o={}; Object.keys(r).forEach(k=>{if(!k.startsWith('_')) o[k]=r[k]}); return o}); const ws=XLSX.utils.json_to_sheet(clean); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'정산'); XLSX.writeFile(wb,name); }
 $('pickBtn').onclick=()=>$('fileInput').click(); $('drop').onclick=e=>{ if(e.target.id!=='pickBtn') $('fileInput').click();}; $('fileInput').onchange=e=>handleFile(e.target.files[0]); ['dragenter','dragover'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').style.background='#fff1de'})); ['dragleave','drop'].forEach(ev=>$('drop').addEventListener(ev,e=>{e.preventDefault();$('drop').style.background=''})); $('drop').addEventListener('drop',e=>handleFile(e.dataTransfer.files[0])); $('calcBtn').onclick=calculate; $('resetBtn').onclick=()=>{rawRows=[];details=[];summary=[];$('fileInput').value='';['startDate','endDate','search'].forEach(id=>$(id).value='');setStatus('아직 파일을 불러오지 않았습니다.');render();}; $('downloadSummary').onclick=()=>download('연주자별_정산요약.xlsx',summary); $('downloadDetail').onclick=()=>download('연주자별_정산상세.xlsx',details);
+loadTaxKeywords();
+$('taxKeywords').addEventListener('input',()=>{ saveTaxKeywords(); if(rawRows.length) calculate(); });
+$('taxKeywords').addEventListener('change',saveTaxKeywords);
+saveTaxKeywords();
 </script>
 </body></html>
