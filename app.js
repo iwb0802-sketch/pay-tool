@@ -6,6 +6,10 @@ let summaryRows = [];
 let warningRows = [];
 const TAX_RATE = 0.033;
 const TAX_KEY='bns_tax_keywords';
+const SUPABASE_URL='https://qppmzzkkoyxkhwqxihxk.supabase.co';
+const SUPABASE_KEY='sb_publishable_1ewn3vEpDLZ7eFMl95pVlw_JlI7PSoC';
+const SETTINGS_KEY='tax_keywords';
+let saveTimer=null;
 
 const fileInput = $('#fileInput');
 const dropZone = $('#dropZone');
@@ -17,9 +21,92 @@ fileInput.addEventListener('change', e => { const f=e.target.files?.[0]; if(f) l
 $('#runBtn').addEventListener('click', runSettlement);
 $('#resetBtn').addEventListener('click', () => { $('#keyword').value=''; render(detailRows, summaryRows, warningRows); });
 const taxKeywordsEl = $('#taxKeywords');
-if(taxKeywordsEl){ taxKeywordsEl.value = localStorage.getItem(TAX_KEY) || '세금x'; taxKeywordsEl.addEventListener('input', ()=>{ localStorage.setItem(TAX_KEY, taxKeywordsEl.value); if(rawRows.length) runSettlement(); }); }
+const syncStatusEl = $('#syncStatus');
+if(taxKeywordsEl){
+  taxKeywordsEl.value = localStorage.getItem(TAX_KEY) || '세금x';
+  loadTaxKeywordsFromCloud();
+  taxKeywordsEl.addEventListener('input', ()=>{
+    localStorage.setItem(TAX_KEY, taxKeywordsEl.value);
+    scheduleCloudSave();
+    if(rawRows.length) runSettlement();
+  });
+}
 $('#downloadSummary').addEventListener('click', () => downloadExcel('연주자별_정산요약.xls', summaryRows.map(r => ({연주자:r.performer, 건수:r.count, 총페이:r.total, '3.3%공제후':r.net, 세금제외건수:r.taxExemptCount}))));
 $('#downloadDetail').addEventListener('click', () => downloadExcel('연주자별_정산상세.xls', detailRows.map(toKoreanDetail)));
+
+
+function setSyncStatus(msg, type=''){
+  if(!syncStatusEl) return;
+  syncStatusEl.textContent = msg || '';
+  syncStatusEl.className = 'syncStatus ' + (type || '');
+}
+
+async function supabaseRequest(path, options={}){
+  const headers = {
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${SUPABASE_KEY}`,
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation',
+    ...(options.headers || {})
+  };
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {...options, headers});
+  if(!res.ok){
+    const text = await res.text().catch(()=> '');
+    throw new Error(`${res.status} ${text}`);
+  }
+  if(res.status === 204) return null;
+  return res.json().catch(()=>null);
+}
+
+async function loadTaxKeywordsFromCloud(){
+  try{
+    setSyncStatus('공제 제외 목록 불러오는 중...', 'loading');
+    const data = await supabaseRequest(`settings?key=eq.${encodeURIComponent(SETTINGS_KEY)}&select=value&limit=1`);
+    const cloudValue = Array.isArray(data) && data[0]?.value ? data[0].value : '';
+    if(cloudValue){
+      taxKeywordsEl.value = cloudValue;
+      localStorage.setItem(TAX_KEY, cloudValue);
+      if(rawRows.length) runSettlement();
+      setSyncStatus('공용 저장소에서 불러옴', 'ok');
+    }else{
+      setSyncStatus('공용 저장소 비어있음 · 입력하면 자동 저장', 'muted');
+      if((taxKeywordsEl.value || '').trim()) scheduleCloudSave(300);
+    }
+  }catch(err){
+    console.error('Supabase load failed', err);
+    setSyncStatus('공용 저장 실패/불러오기 실패 · 이 브라우저에만 임시 저장', 'bad');
+  }
+}
+
+function scheduleCloudSave(delay=700){
+  clearTimeout(saveTimer);
+  setSyncStatus('저장 대기 중...', 'loading');
+  saveTimer = setTimeout(saveTaxKeywordsToCloud, delay);
+}
+
+async function saveTaxKeywordsToCloud(){
+  const value = taxKeywordsEl?.value || '';
+  localStorage.setItem(TAX_KEY, value);
+  try{
+    setSyncStatus('공용 저장소 저장 중...', 'loading');
+    const exists = await supabaseRequest(`settings?key=eq.${encodeURIComponent(SETTINGS_KEY)}&select=key&limit=1`);
+    if(Array.isArray(exists) && exists.length){
+      await supabaseRequest(`settings?key=eq.${encodeURIComponent(SETTINGS_KEY)}`, {
+        method:'PATCH',
+        body: JSON.stringify({value})
+      });
+    }else{
+      await supabaseRequest('settings', {
+        method:'POST',
+        body: JSON.stringify({key: SETTINGS_KEY, value})
+      });
+    }
+    setSyncStatus('공용 저장 완료 · 다른 단말기에서도 유지됨', 'ok');
+  }catch(err){
+    console.error('Supabase save failed', err);
+    setSyncStatus('공용 저장 실패 · 이 브라우저에만 저장됨', 'bad');
+  }
+}
 
 async function loadFile(file){
   const buf = await file.arrayBuffer();
